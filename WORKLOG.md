@@ -86,3 +86,77 @@ RUN the system end-to-end in the sandbox.
 - Issues #1-4 CLOSED with evidence (discovery, subtitles, providers/
   translation, CLI). Issues #5-11 OPEN; #5 (CI) closed after green run
   `00e3155` — see its evidence comment.
+
+## Session 3 — 2026-11-17 (UTC)
+
+### Trigger and corrections
+Owner corrected two failures from sessions 1-2: (1) ClipForge must be
+demonstrated as a CLIPPING tool on real footage — synthetic test patterns
+were a fixture, not the product; (2) session 1 worked "blindly": fork/push
+attempts happened before token permissions were verified. Also supplied:
+a fresh fine-grained PAT and the full Master Execution Prompt (1286 lines)
+with a persistence/recovery/UI addendum that takes precedence for task
+tracking, persistence, and UI quality.
+
+### Work performed
+1. **Verify-first discipline restored** (the owner's complaint #2):
+   authenticated identity + `.permissions` (push/admin/maintain all true
+   on `Bilal140202/clipforge`) verified BEFORE any task. Token stored only
+   in sandbox secrets (never printed/committed). Owner advised to rotate:
+   the PAT is exposed in chat history, and the master prompt itself says
+   "Never ask the user to paste a token into chat".
+2. **Full master prompt read** (upload/Pasted Content_1794840934216.txt,
+   1286 lines) and persisted verbatim as `docs/GOVERNANCE.md` (issue #12).
+   AGENTS.md now encodes verify-before-work, startup protocol (§10), and
+   session ending checklist (§11).
+3. **Issues #12/#13/#14 created BEFORE implementation** (addendum §2).
+4. **Real-footage clipping e2e (issue #13)**: NASA `NHQ_2021_0222_VF`
+   Perseverance landing narration, 9.5 min, public domain (24.8MB 320px
+   preview). Local faster-whisper transcription: 368 words / 47 segments /
+   569.6s. Discovery: 5 kept / 66 suppressed, rank-1 = 432.3-478.9s (live
+   landing-commentary segment). Render: 46.63s 1080×1920 + Spanish
+   bilingual variant (real LLM translation). Subtitle gates 5/5 passed.
+   Three extracted frames visually verified: real Mars surface footage
+   with hook + Spanish line + karaoke captions rendering correctly.
+5. **Ground-truth honesty**: NASA's official SRT asset for this video is a
+   placeholder ("captions pending"), so no objective accuracy comparison
+   was possible — recorded, not papered over. ASR artifacts on compressed
+   320px audio documented as KI-008.
+6. **Recovery tooling (issue #12)**: `scripts/checkpoint.py` (measured
+   health JSON + WORKLOG checkpoint notes) + `docs/RECOVERY.md` honest
+   runtime inventory — no auto-resume exists in this runtime; GitHub is
+   the only durable store; recovery = the documented startup protocol.
+7. **UI audit extension (issue #14)**: `docs/ui-research/
+   USER_PROJECT_UI_AUDIT.md` Part III — 153-repo inventory across
+   Bilal140202/ansaribilal14/superz1402 + six new deep dives (OVE Android
+   5/5, OVE Web 4/5, Your-Files-Redesign 5/5, AuraGallery 4/5,
+   Choose-Your-Monster 2/5, nexpdf +motion tokens 4/5) with file-path
+   citations and 15 engineering lessons (force-dark studio, token review
+   rule, commit-once gestures, honest states, screen-state maps,
+   tool-chip bar, semantic lane colors, tabular-nums).
+
+### Failures and fixes this session
+- NASA collection.json URL contains a smart quote + spaces → curl
+  "Malformed input" → fixed via urllib path quoting (persisted
+  `scripts/fetch_real_footage.py`).
+- `USER_PROJECT_UI_AUDIT.md` Write initially failed (file exists from
+  session 1) → resolved by APPENDING Part III, preserving session-1 work
+  (addendum rule: never overwrite without understanding).
+- KI-007 recorded: 2-line Spanish translations can graze the karaoke
+  caption (Trans MarginV) — cosmetic, caption polish pass.
+
+### Commits and verification
+- (recorded in issue #12/#13/#14 closure comments; push verified via
+  `git ls-remote` + API at commit time — see checkpoint entries below)
+
+### Next actions
+1. Issue #6 output-validation module (Phase-2 exit) — now more urgent
+   since real-footage renders exist.
+2. Issue #7 LLM re-ranking (rank-1 "hook" fragments on real footage show
+   heuristic limits; KI-008).
+3. Issue #8 multilingual corpus + Ollama path; issue #9 font packs;
+   issue #10 agent guides/MCP + screen-state map (Part III lessons #7-#9);
+   issue #11 docs set.
+
+### Checkpoint 2026-11-16T17:10:26+00:00 — session 3: governance+recovery adopted, real-footage e2e (#13), UI audit Part III (#14); committing #12/#13/#14 work
+- branch `main` head `d37a04a38d75` remote_head `d37a04a38d75` synced=True dirty=8

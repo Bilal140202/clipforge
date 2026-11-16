@@ -6,21 +6,24 @@ Repo: `Bilal140202/clipforge` (fresh, no fork lineage). Updated 2026-11-17.
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| 0 | Recon + reference research | complete (docs/research/, capability map; carried from session 1, re-homed) |
+| 0 | Recon + reference research | complete (docs/research/, capability map; re-homed) |
 | 1 | Architecture + contracts | complete for v0.2 (modules, CLI contract, candidate schema) |
-| 2 | Media foundation (import/probe/cut/reframe/render/validate) | partial — cut/reframe/burn verified; standalone output-validation module pending |
-| 3 | Transcription + subtitles | partial — transcription verified; subtitle gates + SRT/VTT built and unit-tested; editor-ready revision model pending |
-| 4 | Moment discovery | heuristic v1 verified e2e; LLM re-ranking adapter pending |
-| 5 | Translation/multilingual | provider path verified e2e (en→es via z-ai); corpus validation + local Ollama path pending |
-| 6 | Caption/font engine | partial — karaoke + hook + bilingual styles; font packs pending |
-| 7 | Smart reframing + polish | center-crop + MediaPipe path present; batch/thumbnails pending |
-| 8 | Agent interfaces | CLI contract shipped (`python -m clipforge.cli --help`, `doctor`); MCP/skill files pending |
-| 9 | Docs + showcase | README honest-status shipped; guides + screenshots pending |
+| 2 | Media foundation | **real-footage validated** (NASA 9.5-min e2e, issue #13); standalone output-validation module still pending (issue #6) |
+| 3 | Transcription + subtitles | transcription + gates verified on real footage; revision model pending |
+| 4 | Moment discovery | heuristic v1 verified on real + synthetic; LLM re-ranking pending (issue #7) |
+| 5 | Translation/multilingual | en→es verified e2e twice (synthetic + real); corpus + Ollama path pending (issue #8) |
+| 6 | Caption/font engine | karaoke + hook + bilingual verified; KI-007 spacing graze; font packs pending (issue #9) |
+| 7 | Smart reframing + polish | center-crop verified (320px source upscaled); batch/thumbnails pending |
+| 8 | Agent interfaces | CLI contract shipped; governance + recovery tooling adopted (issue #12); MCP/skill files pending (issue #10) |
+| 9 | Docs + showcase | GOVERNANCE/RECOVERY/audit docs shipped; guides + screenshots pending (issue #11) |
 
 ## Next highest-value
 
-1. Output-validation module (ffprobe-based artifact gate) — Phase 2 exit.
-2. LLM re-ranking adapter over discovery candidates (provider layer ready).
-3. GitHub Issues: create milestone + task set (issues are enabled here).
-4. CI workflow (tests.yml) on the fresh repo, verified green.
-5. Agent guides + real screenshots (docs/ui-research/ is the spec).
+1. Issue #6: output-validation module (ffprobe artifact gate) — Phase-2 exit.
+2. Issue #7: LLM re-ranking adapter (provider layer ready; real-footage
+   rank-1 hooks show heuristic limits).
+3. Issue #8: multilingual corpus (ko/th/ja/zh + code-switching) + Ollama
+   path verification.
+4. Issue #10: agent guides + screen-state maps (audit Part III lessons
+   #7-#9 are the spec source).
+5. Issue #11: user docs (INSTALLATION/QUICK_START/USER_GUIDE/CLI_REFERENCE).
