@@ -198,3 +198,76 @@ These are the anti-patterns actually observed across the twelve projects. They a
 16. **Content coupled into view files.** ahyeon-s-vision's 1,100-line `Index.tsx` holds all copy and data inline. Keep project data, copy, and view layers separated so the UI can be reasoned about.
 17. **Uniform-weight screens.** Playbook Law 9: every card the same elevation, every heading the same size. In a dense editor this is the difference between "where do I look" and a wall of equal cards.
 18. **Stale-red-at-top ranking.** Playbook candidate 17: a known, stale, unfixable item in the top slot trains people to skip the top. Rank queues by actionable severity; park known-stale items honestly.
+
+---
+
+## Part III — 2026-11-17 extension: fresh full-inventory audit + 6 new deep dives
+
+This extension re-enumerated all three accounts (153 public repos total) and deep-audited six previously-uncovered or updatable projects. Parts I–II remain valid; where Part III re-touches a repo from Part I (nexpdf), it adds new detail (motion tokens), not contradictions.
+
+### Full account inventory (2026-11-17, public repos)
+
+**Bilal140202 — 84 repos.** UI-relevant highlights beyond Parts I–II: AuraGallery (Compose/M3 gallery, audited below), Your-Files-Redesign (audited below), Choose-Your-Monster (audited below), VoxFlow (voice dictation, M3), HeyYou (on-device Whisper+Gemma), comet-x-browser, MobileAgent, jarvis-agent (covered in Part I), Todoapp (Flutter), Zero-Play-Store (Flutter), emberwake (Three.js), ether-living-ledger (WebGL), signal-noise (Part II), Pdfcanvas/Pdfeditor, Lumesearch, Jungahyeon, Resume, Storygen, UnsentLetters. The remainder are agent/pipeline/infra repos with no UI surface (igagent, imgagent, ttagent, xthread-agent, ytagent, snip, lkos-system, privacy-think, openmemory, ai-documentary-studio, myang-studio, contentforge, universal-transcriptor, multilingual-subtitle-translator, UniversalSubtitleGenerator, The-Freshtok, homebrew-snip, nights-cdn, workspace backups, profile/README repos, and misc). — next-in-line candidates if this audit is extended.
+
+**ansaribilal14 — 36 repos.** UI-relevant: open-video-engine-android and open-video-engine-web (audited below — the most ClipForge-relevant codebases found anywhere in the three accounts), zerium-browser / zerium-gecko (Java WebView/GeckoView browsers), EchoID-Android (Compose M3), babymomo (Compose AI companion). The rest are documentary/shorts pipelines, agent mirrors (declared "backup mirror" of Bilal140202 originals — originals audited instead), and infra.
+
+**superz1402 — 33 repos.** UI-relevant: nexpdf (Part I + extension below), india-city-builder (zero-dep isometric canvas game), linuxify (Part I), agent-ui-playbook (Part II — the quality standard), plus code-drawn documentary landing pages (films, somerton-man-documentary, ostrich-documentary, early-access, clinic-demos, imgagent-site) and pipeline repos (supoclip, perfect-srt, opus-video-engine, clipforge-legacy, momo-subtitle C++).
+
+### New deep dive 1: ansaribilal14/open-video-engine-android — Kotlin (Compose + M3) — 5/5 polished
+
+The Android client of the OVE video engine; the single most ClipForge-relevant codebase found. Editor workspace: preview pane → transport → canvas timeline → CapCut-style tool-chip bar.
+
+- **Visual design**: `app/src/main/java/app/ove/studio/ui/theme/Color.kt` is the declared "single source of truth" ("no other file may introduce a color literal (review rule M)") — dark editor surfaces `#0F1014`/`#16171C`/`#1C1E24`, one cyan accent `#22E5CE`, cyan→blue CTA gradient `#2BE0C8→#2E7CF6`, clip gradient `#3B82F6→#22D3EE`. `docs/UI_SYSTEM.md` documents every token and bans gradients/glassmorphism/accent soup elsewhere. `Tokens.kt`: 4dp spacing grid, shape scale 8/12/20dp, `TimelineMetrics` (ruler 22dp, track pitch 52dp, clip corner 6dp, min target 44dp), `ToolBarMetrics` (44dp chip tile, 10sp label).
+- **Layout engineering**: `editor/EditorScreen.kt` — preview box, `TransportBar` with timecode chips + 44dp accent play button, `TimelineView`; forced dark via `OveTheme(forceDark = true)` ("preview fidelity decision", `ui/theme/Theme.kt`). `docs/SCREEN_STATE_MAP.md` tabulates every screen state incl. exportRunning with "the engine does not support cancel" stated honestly, and recovery with hash-mismatch card.
+- **Interaction engineering**: `editor/components/TimelineView.kt` renders ruler/tracks/clips/selection/trim-handles/playhead on one Compose `Canvas`; one `awaitEachGesture` loop discriminates scrub (ruler drag), trim (14dp handles, live preview, `commitTrim()` exactly once on release), pinch-zoom anchored at playhead, display seconds snapped back to exact 48 kHz rationals via `snap()`. `ToolChip.kt` icon-tile-over-label chips with danger/selected/accent variants; chips built conditionally from selection state — "ONLY operations the engine actually supports — no dead controls, ever".
+- **Implementation quality**: semantics `contentDescription` on timeline and all transport controls; playhead error-red with alpha-0.28 glow + white core ("highest-contrast element"); audio presence shown as "honest indicator, no fake waveform" badge; ViewModel + `collectAsStateWithLifecycle`, snackbar notices, real import progress.
+
+### New deep dive 2: ansaribilal14/open-video-engine-web — Rust + React/Vite — 4/5 polished
+
+- **Visual design**: `web/src/styles.css` "CapCut-language rebase", tokens "measured from MIT-licensed references (OpenCut classic dark scheme)": `--background:#0D0D0D`, `--surface:#1A1A1A`, single accent `--primary:#16A9F3`, track-type colors `--clip-video:#2C4A63` / `--track-audio:#8F5DBA` / `--track-text:#5DBAA0`, no-pill radius scale (`--radius-clip:4px`…`--radius-sheet:12px`), `--mono` with `font-variant-numeric: tabular-nums` for time chips; uppercase 12px letter-spaced `.panel-title` headers.
+- **Layout engineering**: `.editor-body` 3-column grid `240px 1fr 260px` (pool | preview+transport | properties); <1024px stacks "CapCut-mobile order", pool collapses to a context bar. `views/Home.tsx` project cards with Loading/empty/`.pcard.missing` states; `views/Editor.tsx` pool-empty/preview-empty placeholders; progress bar "honest: indeterminate only".
+- **Interaction engineering**: `web/src/components/Timeline.tsx` pointer-event state machine (scrub/pan/trimL/trimR/move); ruler ticks ≥80px apart (`drawRulerStep` over 1/24s→600s candidates); frame-level labels under 1s steps; wheel zoom anchored at cursor; edge-snap 10px; `HANDLE_W=8` visual vs `HANDLE_HIT=14` touch zone. Header comment records the v0.1.0→v0.1.1 lesson: keep gesture previews local (`trimPreviewRef`/`moveGhostRef`) and commit once on release — per-pointermove mutations "froze the UI".
+- **Implementation quality**: colors read live from CSS custom properties via `getComputedStyle` (canvas redraws follow theme edits); DPR-aware canvas + `ResizeObserver`; documented pragmatic hack (draw effect without dependency array).
+
+### New deep dive 3: Bilal140202/Your-Files-Redesign — Kotlin (Compose M3, i18n EN/JA/KO/ZH) — 5/5 polished
+
+The most systematic theming architecture of all audited projects: themes as complete design contracts.
+
+- **Visual design**: `uim3/theme/Color.kt` full light/dark neutral ramps (warm paper `#FAF9F7` light, "deep warm charcoal" `#141317` dark, complete `surfaceContainerLowest…Highest` ladders), `AppColors` semantic set (Success `#3BA55D`, Warning `#E8A13C`, Info `#4C8DD6`, Error `#D65B5B`), category hues (images pink `#E0669B`, videos purple `#9D6BD8`, audio amber, documents blue, APK green, archives brown); `CategoryColors.kt` single-accessor color+icon maps.
+- **Layout engineering**: `ThemeColors` carries *layout parameters* — `itemLayoutStyle` (LIST_ROW/CARD/COMPACT), `listItemHeight`, `thumbnailSize`, `showDividers`, `coloredHeader` — so a theme changes structure. `AppThemeManager.kt` ships 6 full templates (Calm, Cards, Compact, Material You, Vibrant, Spacious); persisted-index rule "never reorder, only refresh contents".
+- **Interaction engineering**: `app/ui/Modifiers.kt` centralizes `touchTarget(48dp)`, `listItem()`, `screenPadding()`; `Spacing.kt` named paddings ("generous air is part of the soft-premium identity"); localized strings incl. content descriptions in `res/values-{ja,ko,zh-rCN}/`.
+- **Implementation quality**: `Theme.kt` derives the whole M3 `Shapes` set from one `cornerRadius` token (xsmall=0.35r … xlarge=1.9r capped 40dp); per-theme neutral overrides with fallback defaults.
+
+### New deep dive 4: Bilal140202/AuraGallery — Kotlin (Compose M3, TFLite CLIP) — 4/5 solid
+
+- `ui/theme/Color.kt`: teal identity (`PrimaryLight #006A6A`, `PrimaryDark #4FE3E0`), near-black surfaces with contrast-paired containers; `res/values-night/colors.xml` override for launcher chrome. `GalleryScreen.kt`: collapsible `LargeTopAppBar`, date-grouped 3-column grid with stable keys, `contentPadding=100dp` for bottom-bar clearance; reusable `EmptyState(icon,title,body,action)`, `IndexingProgressStrip` with real counts ("Indexed X of Y"), model-download banner with live percentage. `PhotoTile.kt`: `combinedClickable` (long-press reserved for selection), Coil crossfade + `BrokenImage` fallback. Empty ≠ loading confusion handled explicitly. Thinner custom identity than OVE/Your-Files, otherwise clean M3.
+
+### New deep dive 5: Bilal140202/Choose-Your-Monster — React 19 + Framer Motion + Tailwind v4 — 2/5 rough
+
+`tailwind.config.js`: Orbitron display font + five named animation keyframes; `src/index.css` hand-built radial-gradient atmospheres on near-black. `HomePage.jsx` single responsive grid `grid-cols-2 sm:3 md:4 lg:7`. `MemberCard.jsx` delegates hover to Framer Motion (`whileHover {scale 1.05, borderColor, glow boxShadow}`, spring stiffness 300). The `safelist` array enumerates every dynamically-composed member color class — a working but manual pattern. Weaknesses: hardcoded card visuals, inline-style font, "Placeholder for a techno font" comments, no tokens. Transferable: the Framer-Motion hover pattern and the Tailwind safelist caution.
+
+### New deep dive 6: superz1402/nexpdf — Kotlin (Compose "M3 Expressive") — 4/5 polished (extends Part I §5)
+
+New in this pass: `ui/theme/Motion.kt` is a named motion-token object — QUICK 120 / STANDARD 220 / EMPHASIZED 320 ms, expressive easing curves (`EmphasizedDecelerate (0.05,0.7,0.1,1.0)` etc.), `expressiveSpring()` (low-bouncy). `ui/viewer/ViewerScreen.kt` models the viewer as sealed `ViewerUi` (`Loading`/`Error`/`Ready`) with per-page `Skeleton` placeholders at the real 1/√2 aspect ratio; `ui/common/Skeleton.kt` reusable shimmer (`infiniteRepeatable` alpha 0.5→1.0 on `surfaceContainerHighest`); `ui/AppRoot.kt` string-route state machine. One of the few audited codebases with real motion tokens.
+
+### Engineering lessons for ClipForge (evidence-backed, extends the anti-pattern list)
+
+1. **Force the studio surfaces dark; let home/settings follow the system** — OVE `OveTheme(forceDark = true)`, rationale in `docs/UI_SYSTEM.md §10` (color-faithful video preview).
+2. **One file owns every color, enforced as a review rule** — OVE Color.kt "review rule M".
+3. **Pixels are display-only; commit exact values at the engine boundary** — `snap()` to 48 kHz rationals; `secondsToTickRat`.
+4. **Local gesture preview, single commit on release** — OVE Web's documented freeze bug fix.
+5. **Name the timeline's magic numbers** — one metrics object (ruler 22dp, track pitch 52dp, clip corner 6dp, handle 14dp, chips 44dp).
+6. **Separate visual size from hit size on trim handles** — 8px drawn vs 14px hit.
+7. **Honest states only: no fake waveforms, no fake progress, no fake cancel** — an export sheet that *states* cancel is unsupported beats a dead button.
+8. **Write the screen-state map before the screens** — every polished system here has one (`SCREEN_STATE_MAP.md`).
+9. **CapCut-style contextual tool-chip bar** — 44dp icon tile + 10sp label, assembled from selection state, danger-tinted destructive, "no dead controls".
+10. **One accent; reserve red for the playhead** — alpha-0.28 glow + white core.
+11. **Semantic track colors per lane type** — video/audio/text lanes; ClipForge: discovery/candidate/subtitle/render lanes.
+12. **Theme = palette + structure, not recoloring** — ThemeColors bundles layout params; persistence rule "never reorder indexes, only refresh contents".
+13. **Central semantic status maps for queue states** — queued/rendering/done/failed, new/kept/rejected from one map, never inline hexes.
+14. **Sealed UI state + reusable Loading/Error/Empty primitives** — `ViewerUi`, `Skeleton.kt`, generic `EmptyState`.
+15. **Motion and timecode typography as tokens** — named durations 120/220/320ms; `tabular-nums` wherever times render, or columns jitter.
+
+### Extension limitations
+
+Same method limits as the header: public repos only (this session's fine-grained token cannot read ansaribilal14/superz1402 privates); code-level, no runtime/screenshots; 6 deep dives on top of Parts I–II's 12 projects; remaining next-in-line repos listed in the inventory sections above.
