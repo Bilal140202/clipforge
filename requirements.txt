@@ -1,0 +1,8 @@
+faster-whisper>=1.0
+av>=14.2,<15  # faster-whisper 1.2.1 needs av 'metadata_errors', removed in av 15
+opencv-python-headless>=4.8
+mediapipe==0.10.14
+requests>=2.31
+yt-dlp>=2024.1
+argostranslate>=1.9
+numpy>=1.24
