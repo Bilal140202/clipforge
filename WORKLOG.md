@@ -69,7 +69,20 @@ RUN the system end-to-end in the sandbox.
   handling (rewritten); `auto_repair` could not repair leading short cues
   nor split beyond 2 pieces (rewritten with recursive word-boundary split).
 
+- CI on the fresh repo: runs 1-3 failed (av 14.4 no py3.12 linux wheel ->
+  source build missing ffmpeg dev headers; then 2 environment-dependent
+  tests: hardcoded sandbox cwd, 1e-9 float epsilon). Root causes fixed
+  (`av==14.2.0` pin everywhere, argostranslate dropped — translation is
+  provider-based now, portable tests). **Run 4: `00e3155` — success**
+  (https://github.com/Bilal140202/clipforge/actions/runs/43910002949).
+
 ### Next actions
-1. GitHub Issues (native, enabled) — milestone + task set with evidence.
-2. CI `tests.yml` first green run on the fresh repo.
-3. Output-validation module (ffprobe artifact gate) — PLAN.md item 1.
+1. Output-validation module (ffprobe artifact gate) — issue #6, Phase-2 exit.
+2. LLM re-ranking adapter over candidates (issue #7).
+3. Multilingual corpus validation + Ollama path verification (issue #8).
+
+### Ledger status at session end
+- Milestone `v0.2 - Foundation` (MS#1) on GitHub.
+- Issues #1-4 CLOSED with evidence (discovery, subtitles, providers/
+  translation, CLI). Issues #5-11 OPEN; #5 (CI) closed after green run
+  `00e3155` — see its evidence comment.
