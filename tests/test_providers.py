@@ -102,10 +102,12 @@ def test_build_bilingual_ass_contains_karaoke_and_trans(tmp_path):
 
 
 def test_cli_doctor_smoke():
+    import pathlib
     import subprocess
     import sys
+    repo = str(pathlib.Path(__file__).resolve().parents[1])
     proc = subprocess.run(
         [sys.executable, "-m", "clipforge.cli", "doctor"],
-        cwd="/home/z/my-project/clipforge", capture_output=True, text=True)
+        cwd=repo, capture_output=True, text=True)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert '"ffmpeg": true' in proc.stdout

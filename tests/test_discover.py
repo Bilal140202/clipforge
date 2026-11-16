@@ -1,8 +1,10 @@
 """Unit tests for clipforge.discover (pure logic + one ffmpeg smoke)."""
 import json
 import math
+import pathlib
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -133,7 +135,7 @@ def test_compute_rms_and_zscores(tmp_path):
     assert rms is not None and len(rms) == 4
     assert (rms > 0).all()
     z = discover.energy_zscores(rms)
-    assert abs(float(z.mean())) < 1e-9
+    assert abs(float(z.mean())) < 1e-6  # CI float noise is ~1e-9
 
 
 def test_window_energy_neutral_without_audio():
@@ -145,10 +147,11 @@ def test_cli_writes_candidates_json(tmp_path, dense_then_silence_transcript):
     tr_path = tmp_path / "transcript.json"
     tr_path.write_text(json.dumps(dense_then_silence_transcript))
     out = tmp_path / "candidates.json"
+    repo = str(pathlib.Path(__file__).resolve().parents[1])
     proc = subprocess.run(
-        ["python3", "-m", "clipforge.discover", "--transcript", str(tr_path),
-         "--top-n", "3", "--out", str(out)],
-        cwd="/home/z/my-project/clipforge", capture_output=True, text=True)
+        [sys.executable, "-m", "clipforge.discover", "--transcript",
+         str(tr_path), "--top-n", "3", "--out", str(out)],
+        cwd=repo, capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr
     data = json.loads(out.read_text())
     assert data["engine"] == "clipforge-discovery-v1"
