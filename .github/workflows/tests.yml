@@ -1,0 +1,43 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # Tests exercise discovery/captions/pick logic only; the heavy runtime
+      # pins (argostranslate->torch, mediapipe==0.10.14) are not imported by
+      # tests, so CI installs the test-needed subset. requirements.txt stays
+      # the source of truth for full runtime installs.
+      - run: pip install faster-whisper "av>=14.2,<15" numpy requests pytest
+      - name: Run test suite
+        run: python -m pytest tests/ -v --tb=short
+      - name: Discovery CLI smoke on synthetic transcript
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+          words = []
+          t = 0.0
+          for i in range(60):
+              words.append({"start": round(t, 2), "end": round(t + 0.28, 2),
+                            "text": ("Why are facts?" if i == 0 else f"w{i}")})
+              t += 0.32
+          seg = {"language": "en", "duration": 20.0,
+                 "words": words, "segments": []}
+          open("tr.json", "w").write(json.dumps(seg))
+          r = subprocess.run([sys.executable, "-m", "clipforge.discover",
+                              "--transcript", "tr.json", "--top-n", "3",
+                              "--out", "cand.json"], capture_output=True)
+          print(r.stdout.decode(), r.stderr.decode())
+          sys.exit(r.returncode)
+          PY

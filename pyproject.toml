@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clipforge"
+version = "0.2.0"
+description = "Local-first, agent-operable short-form video clipping studio: discovery, subtitles, translation, rendering."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+  "faster-whisper>=1.0",
+  "av>=14.2,<15",  # faster-whisper 1.2.1 needs av 'metadata_errors', removed in av 15
+  "opencv-python-headless>=4.8",
+  "mediapipe==0.10.14",
+  "requests>=2.31",
+  "yt-dlp>=2024.1",
+  "numpy>=1.24",
+]
+
+[project.scripts]
+clipforge = "clipforge.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
