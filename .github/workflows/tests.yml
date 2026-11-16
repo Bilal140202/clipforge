@@ -19,7 +19,7 @@ jobs:
       # pins (argostranslate->torch, mediapipe==0.10.14) are not imported by
       # tests, so CI installs the test-needed subset. requirements.txt stays
       # the source of truth for full runtime installs.
-      - run: pip install faster-whisper "av>=14.2,<15" numpy requests pytest
+      - run: pip install faster-whisper "av==14.2.0" numpy requests pytest
       - name: Run test suite
         run: python -m pytest tests/ -v --tb=short
       - name: Discovery CLI smoke on synthetic transcript
