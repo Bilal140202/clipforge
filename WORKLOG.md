@@ -233,3 +233,6 @@ Verified: owner rank-1 re-rendered translation-only (45.97s, 1080x1920,
 face-tracked), gates 5/5 0 violations, frames QA'd (EN-only captions in
 zone; remaining Korean text in one frame is the source's own burn-in).
 52/52 tests.
+
+### Checkpoint 2026-11-17T09:55:46+00:00 — session 5: translation-only caption mode (#16) with G2 fit enforcement; owner clip re-rendered EN-only
+- branch `main` head `f0143b488f0d` remote_head `f0143b488f0d` synced=True dirty=0
