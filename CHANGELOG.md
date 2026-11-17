@@ -3,6 +3,25 @@
 All notable changes. Dates are UTC. Issue numbers reference
 `Bilal140202/clipforge` on GitHub.
 
+## [0.4.2] — 2026-11-17
+
+### Fixed — shot detection actually works; crop motion is now cut-aligned
+- `shots.py`: showinfo writes at INFO level, and the previous
+  `-v error` capture silenced it — scene detection ALWAYS returned []
+  and every source looked single-take. Detection now runs without
+  `-v error` and warns loudly on failure (verified on a 33.6-min
+  fast-cut source: 703 cuts / 20.9 per min, where the old code
+  claimed 0).
+- `reframe.py`: the 9:16 crop now changes framing ONLY at the source's
+  own camera cuts (the snap is masked by the cut); between cuts it is
+  dead-zoned (10% width) and velocity-capped (6% width/s). The crop
+  never invents motion the source doesn't have — measured: rendered
+  frame-diff spikes now coincide exactly with the source's cut
+  timestamps.
+- `reframe.py`: fixed a crash when real faces appear (`rects or []` is
+  truthy-ambiguous for numpy arrays; `detectMultiScale` results are
+  now length-checked). Found on the first real-faces render.
+
 ## [0.4.1] — 2026-11-17
 
 ### Fixed — the "cuts camera angles every few seconds" reframe bug

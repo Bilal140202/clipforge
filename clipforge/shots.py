@@ -31,19 +31,26 @@ EPSILON = 0.05
 def detect_shot_changes(path, threshold=SCENE_THRESHOLD):
     """Timestamps (seconds, ascending) where the source changes shot.
 
-    Returns [] when ffmpeg fails or finds no scene changes - callers
-    must treat shots as optional evidence, never a hard dependency.
+    showinfo logs at INFO level, so stderr must NOT be captured with
+    `-v error` (that silences it - the bug that made every source look
+    like it had zero cuts). Returns [] when ffmpeg fails (loud warning)
+    or when the source genuinely has no cuts - callers treat shots as
+    optional evidence, never a hard dependency.
     """
     cmd = [
-        "ffmpeg", "-v", "error", "-an", "-sn", "-i", str(path),
+        "ffmpeg", "-an", "-sn", "-i", str(path),
         "-vf", f"scale=192:-2,select=gt(scene\\,{threshold}),showinfo",
         "-f", "null", "-",
     ]
     try:
-        proc = subprocess.run(cmd, capture_output=True, timeout=900)
+        proc = subprocess.run(cmd, capture_output=True, timeout=1200)
     except (OSError, subprocess.TimeoutExpired):
+        print("[shots] WARNING: scene detection failed to run - "
+              "no shot evidence (treat as single-take or retry)")
         return []
     if proc.returncode != 0:
+        print(f"[shots] WARNING: ffmpeg exited {proc.returncode} - "
+              "no shot evidence")
         return []
     times = sorted(float(t) for t in
                    re.findall(r"pts_time:([0-9]+\.?[0-9]*)",
