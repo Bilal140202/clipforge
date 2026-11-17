@@ -12,9 +12,9 @@ ScriptType: v4.00+
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,78,&H00FFFFFF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,5,0,2,60,60,220,1
+Style: Caption,DejaVu Sans,64,&H00FFFFFF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,5,0,2,110,110,220,1
 Style: Hook,DejaVu Sans,104,&H0000D7FF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,1,0,1,6,0,8,60,60,330,1
-Style: Trans,DejaVu Sans,58,&H0000D7FF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,60,60,320,1
+Style: Trans,DejaVu Sans,54,&H0000D7FF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,60,60,520,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
