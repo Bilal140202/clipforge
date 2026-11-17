@@ -136,15 +136,32 @@ def main():
             args.min_clip, args.max_clip, args.workdir, use_llm=not args.no_llm)
     start, end = moment["start"], moment["end"]
 
+    # Permanent caption-language rule (#17): decide BEFORE heavy work.
+    from . import langrule
+    try:
+        plan = langrule.resolve_caption_plan(transcript.get("language"),
+                                             args.target_lang)
+    except langrule.CaptionChoiceRequired as ask:
+        print(f"[langrule] {ask.question}")
+        for i, c in enumerate(ask.choices, 1):
+            print(f"[langrule]   {i}. {c}")
+        print("[langrule] re-run with an explicit --target-lang (the "
+              "video's language code, or 'en' for full English only)")
+        raise SystemExit(2) from None
+    print(f"[langrule] {plan.note}")
+
     segment = cut_segment(source, start, end, args.workdir)
     reframed = os.path.join(args.workdir, "reframed.mp4")
     reframe.reframe(segment, reframed)
 
     words = clip_words(transcript["words"], start, end)
-    ass_path = os.path.join(args.workdir, "captions.ass")
-    lines = captions.build_ass(words, moment.get("hook"), end - start, ass_path)
     final = os.path.join(args.outdir, "clip_final.mp4")
-    captions.burn("reframed.mp4", "captions.ass", final, cwd=args.workdir)
+    ass_path = os.path.join(args.workdir, "captions.ass")
+    if not plan.english_only:
+        lines = captions.build_ass(words, moment.get("hook"),
+                                   end - start, ass_path)
+        captions.burn("reframed.mp4", "captions.ass", final,
+                      cwd=args.workdir)
 
     translated_ok = False
     translation_provider = None
@@ -157,7 +174,7 @@ def main():
         f.write(subs.serialize_srt(window_cues))
     with open(os.path.join(args.outdir, "captions.vtt"), "w") as f:
         f.write(subs.serialize_vtt(window_cues))
-    if args.target_lang:
+    if plan.translate:
         try:
             from . import providers
             from . import translate as xlate
@@ -167,24 +184,41 @@ def main():
                     "no provider available (ollama/z-ai) - use --provider")
             translation_provider = prov.name
             translated = xlate.translate_cues(
-                window_cues, args.target_lang, prov,
+                window_cues, plan.caption_lang, prov,
                 source_lang=transcript["language"])
+            hook_out = moment.get("hook")
+            if plan.english_only and (hook_out or "").strip():
+                # Rule #17: full English means the hook is English too.
+                hook_out = xlate.fit_hook(
+                    xlate.translate_hook(hook_out, plan.caption_lang, prov,
+                                         source_lang=transcript["language"]))
             t_cues = xlate.write_translated(
                 translated,
                 os.path.join(args.outdir,
-                             f"captions.{args.target_lang}.srt"),
+                             f"captions.{plan.caption_lang}.srt"),
                 os.path.join(args.outdir,
-                             f"captions.{args.target_lang}.vtt"))
-            bi_ass = os.path.join(args.workdir,
-                                  f"captions.{args.target_lang}.ass")
-            captions.build_bilingual_ass(words, t_cues, moment.get("hook"),
-                                         end - start, bi_ass)
-            t_out = os.path.join(args.outdir,
-                                 f"clip_final.{args.target_lang}.mp4")
-            captions.burn("reframed.mp4", os.path.basename(bi_ass), t_out,
-                          cwd=args.workdir)
+                             f"captions.{plan.caption_lang}.vtt"))
+            tl_ass = os.path.join(args.workdir,
+                                  f"captions.{plan.caption_lang}.ass")
+            if plan.english_only:
+                captions.build_translation_only_ass(t_cues, hook_out,
+                                                    end - start, tl_ass)
+                captions.burn("reframed.mp4", os.path.basename(tl_ass),
+                              final, cwd=args.workdir)
+            else:
+                captions.build_bilingual_ass(words, t_cues, hook_out,
+                                             end - start, tl_ass)
+                t_out = os.path.join(
+                    args.outdir, f"clip_final.{plan.caption_lang}.mp4")
+                captions.burn("reframed.mp4", os.path.basename(tl_ass),
+                              t_out, cwd=args.workdir)
             translated_ok = True
-        except Exception as exc:  # noqa: BLE001 - translation is optional
+        except Exception as exc:  # noqa: BLE001 - see permanent rule #17
+            if plan.english_only:
+                raise SystemExit(
+                    "[langrule] English-only render failed; no output "
+                    "written (permanent rule #17 forbids source-language "
+                    "fallback captions)") from exc
             print(f"[translate] skipped: {exc}")
 
     metadata = {
@@ -193,6 +227,8 @@ def main():
         "whisper_model": args.whisper_model,
         "moment": moment,
         "target_lang": args.target_lang or None,
+        "caption_lang": plan.caption_lang or transcript["language"],
+        "caption_rule": plan.note,
         "translated": translated_ok,
         "translation_provider": translation_provider,
         "subtitles_gates": subs.validate(window_cues)["gates"],
@@ -201,7 +237,12 @@ def main():
     with open(os.path.join(args.outdir, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=2)
     shutil.copy(os.path.join(args.workdir, "transcript.json"), args.outdir)
-    shutil.copy(ass_path, args.outdir)
+    if os.path.exists(ass_path):
+        shutil.copy(ass_path, args.outdir)
+    elif plan.translate:
+        shutil.copy(os.path.join(args.workdir,
+                                 f"captions.{plan.caption_lang}.ass"),
+                    args.outdir)
     print(f"[done] artifacts in {args.outdir}: {metadata['outputs']}")
 
 

@@ -236,3 +236,26 @@ zone; remaining Korean text in one frame is the source's own burn-in).
 
 ### Checkpoint 2026-11-17T09:55:46+00:00 — session 5: translation-only caption mode (#16) with G2 fit enforcement; owner clip re-rendered EN-only
 - branch `main` head `f0143b488f0d` remote_head `f0143b488f0d` synced=True dirty=0
+
+## Session 6 — 2026-11-17 (UTC): the permanent caption-language rule (#17)
+
+Owner made it permanent: a clip's captions speak the video's own language
+OR full English — never both, never mixed. English choice also means the
+HOOK is translated (no source-language hook anywhere).
+
+- `langrule.py`: pure decision function + `CaptionPlan`; decision table
+  fully unit-tested (13 tests). ASK path: TTY prompt, else exit 2 with
+  the exact question for agents to relay.
+- Wired into `cli.py render` AND legacy `pipeline.py` (decision before
+  heavy work; pipeline metadata records `caption_rule`).
+- `--caption-mode` demoted to legacy knob: the rule overrides it when
+  English is chosen, with a loud printed note.
+- English-only: hook translated via `translate.translate_hook` +
+  `fit_hook` (18-char/3-line fit for the 104px style); provider failure
+  = hard error, never silent fallback.
+- Verified e2e on owner footage with `--caption-lang en --caption-mode
+  bilingual`: rule overrode the mode, burned English hook + English
+  captions, gates 5/5; frames QA'd; compliant clip re-uploaded to the
+  owner's Drive slot (replacing the Korean-hook version).
+- 69/69 tests. README rewritten (rule table, CLI reference, gates, FAQ);
+  CHANGELOG started; versions synced to 0.4.0.

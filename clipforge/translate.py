@@ -96,6 +96,41 @@ def _fit_subtitle(text, width=42, max_lines=2):
                      for i in range(max_lines))[:2 * width]
 
 
+HOOK_SYSTEM = (
+    "You translate a single short hook line for a vertical video short. "
+    "Keep it punchy and short. You answer with JSON only."
+)
+
+
+def fit_hook(text, width=18, max_lines=3):
+    """Fit a hook line to the big Hook style (~104px font): at most
+    `max_lines` short lines so it never runs off the 1080px frame."""
+    return _fit_subtitle(text, width=width, max_lines=max_lines)
+
+
+def translate_hook(hook, target_lang, provider, source_lang=None):
+    """Translate the hook overlay line (rule #17: an English-only clip
+    must never show a source-language hook). Empty hook -> "". Raises
+    RuntimeError on provider failure — callers must NOT fall back to the
+    untranslated hook on an English-only clip."""
+    if not (hook or "").strip():
+        return ""
+    src = f" (source language: {source_lang})" if source_lang else ""
+    prompt = (
+        f"Translate this hook line into {target_lang}{src}. Keep it short "
+        f"(aim for 60 characters or fewer). Answer JSON only: "
+        f'{{"translation": "<text>"}}\n\nHook: {hook.strip()}')
+    reply = provider.complete(prompt, system=HOOK_SYSTEM)
+    try:
+        data = providers.extract_json(reply)
+    except ValueError as exc:
+        raise RuntimeError(f"hook translation unparseable: {exc}") from exc
+    t = data.get("translation") if isinstance(data, dict) else None
+    if not isinstance(t, str) or not t.strip():
+        raise RuntimeError("hook translation missing from provider reply")
+    return t.strip()
+
+
 def write_translated(cues_translated, srt_path, vtt_path=None):
     from . import subtitles
     t_cues = [{"index": t["index"], "start_ms": t["start_ms"],

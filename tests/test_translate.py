@@ -1,4 +1,6 @@
-"""Unit tests for translate._fit_subtitle + write_translated wrapping."""
+"""Unit tests for translate: _fit_subtitle, write_translated, translate_hook."""
+import pytest
+
 from clipforge import translate
 
 
@@ -41,3 +43,37 @@ def test_write_translated_wraps_cues(tmp_path):
     for line in t_cues[0]["text"].split("\n"):
         assert len(line) <= 42
     assert " --> " in body
+
+
+class _FakeProvider:
+    """Duck-typed provider: returns canned replies from .complete()."""
+
+    def __init__(self, reply):
+        self.reply = reply
+        self.name = "fake"
+
+    def complete(self, prompt, system=None):
+        return self.reply
+
+
+def test_translate_hook_empty_hook_returns_empty():
+    assert translate.translate_hook("", "en", _FakeProvider("{}")) == ""
+
+
+def test_translate_hook_translates_via_provider():
+    p = _FakeProvider('{"translation": "  Why now?  "}')
+    assert translate.translate_hook("왜 지금?", "en", p,
+                                    source_lang="ko") == "Why now?"
+
+
+def test_translate_hook_failure_is_loud():
+    with pytest.raises(RuntimeError):
+        translate.translate_hook("왜 지금?", "en",
+                                 _FakeProvider("not json at all"))
+
+
+def test_fit_hook_wraps_to_big_font_lines():
+    out = translate.fit_hook("Why couldn't I think of filming this before?")
+    for line in out.split("\n"):
+        assert len(line) <= 18
+    assert len(out.split("\n")) <= 3

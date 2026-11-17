@@ -153,8 +153,12 @@ def cmd_render(args):
     dur_s = (end_ms - start_ms) / 1000
     final = os.path.abspath(args.out)
     os.makedirs(os.path.dirname(final) or ".", exist_ok=True)
-    solo = bool(args.translate_lang) and args.caption_mode == "translation"
-    if not solo:
+    # Permanent caption-language rule (#17) decides everything below.
+    plan = _resolve_plan_or_ask(transcript.get("language"),
+                                args.caption_lang or args.translate_lang,
+                                args.caption_mode)
+    print(f"[langrule] {plan.note}")
+    if not plan.english_only:
         ass_path = os.path.join(args.workdir, "captions.ass")
         captions.build_ass(words, args.hook, dur_s, ass_path)
         captions.burn("reframed.mp4", "captions.ass", final,
@@ -163,51 +167,87 @@ def cmd_render(args):
         f.write(subs.serialize_srt(window))
     with open(os.path.splitext(final)[0] + ".vtt", "w") as f:
         f.write(subs.serialize_vtt(window))
-    if args.translate_lang:
+    if plan.translate:
         _translate_burn(args, window, words, reframed, final, dur_s,
-                        transcript.get("language"), primary=solo)
+                        transcript.get("language"),
+                        primary=plan.english_only,
+                        caption_lang=plan.caption_lang)
     print(f"[render] wrote {final}")
     return 0
 
 
+def _resolve_plan_or_ask(source_lang, caption_lang, mode):
+    """Apply the permanent rule (#17). Non-TTY: print the question and
+    exit 2 so an agent can relay it verbatim. TTY: prompt the user."""
+    from . import langrule
+    try:
+        return langrule.resolve_caption_plan(source_lang, caption_lang,
+                                             mode)
+    except langrule.CaptionChoiceRequired as ask:
+        if not sys.stdin.isatty():
+            print(f"[langrule] {ask.question}")
+            for i, c in enumerate(ask.choices, 1):
+                print(f"[langrule]   {i}. {c}")
+            print("[langrule] non-interactive: re-run with an explicit "
+                  "--caption-lang (the video's language code for "
+                  "same-language captions, or 'en' for full English only)")
+            raise SystemExit(2) from None
+        print(f"[langrule] {ask.question}")
+        for i, c in enumerate(ask.choices, 1):
+            print(f"[langrule]   {i}. {c}")
+        pick = ""
+        while pick not in ("1", "2"):
+            pick = input("[langrule] choose 1 or 2: ").strip()
+        answer = "same" if pick == "1" else "en"
+        return langrule.resolve_caption_plan(source_lang, caption_lang,
+                                             mode, answer=answer)
+
+
 def _translate_burn(args, window, words, reframed, final, dur_s,
-                    source_lang, primary=False):
+                    source_lang, primary=False, caption_lang=None):
     from . import captions, providers, translate
+    lang = caption_lang or args.translate_lang
     prov = providers.get_provider(args.provider or None)
     if prov is None:
         print("[render] translation skipped: no provider")
         if primary:
-            raise SystemExit("[render] --caption-mode translation requires "
-                             "a working provider (no fallback captions)")
+            raise SystemExit("[render] English-only captions require a "
+                             "working provider (permanent rule #17: no "
+                             "source-language fallback captions)")
         return
     try:
-        translated = translate.translate_cues(window, args.translate_lang,
-                                              prov,
+        translated = translate.translate_cues(window, lang, prov,
                                               source_lang=source_lang)
         t_cues = translate.write_translated(
-            translated, os.path.splitext(final)[0]
-            + f".{args.translate_lang}.srt")
+            translated, os.path.splitext(final)[0] + f".{lang}.srt")
         tl_path = os.path.join(os.path.abspath(args.workdir),
-                               f"captions.{args.translate_lang}.ass")
+                               f"captions.{lang}.ass")
+        hook_out = args.hook
         if primary:
-            captions.build_translation_only_ass(t_cues, args.hook, dur_s,
+            # Rule #17: full English means the hook is English too.
+            if (hook_out or "").strip():
+                hook_out = translate.fit_hook(
+                    translate.translate_hook(hook_out, lang, prov,
+                                             source_lang=source_lang))
+            captions.build_translation_only_ass(t_cues, hook_out, dur_s,
                                                 tl_path)
             captions.burn(os.path.basename(reframed),
                           os.path.basename(tl_path), final,
                           cwd=os.path.abspath(args.workdir))
-            print(f"[render] translation-only captions -> {final}")
+            print(f"[render] English-only captions -> {final}")
             return
         captions.build_bilingual_ass(words, t_cues, args.hook, dur_s,
                                      tl_path)
-        t_out = os.path.splitext(final)[0] + f".{args.translate_lang}.mp4"
+        t_out = os.path.splitext(final)[0] + f".{lang}.mp4"
         captions.burn(os.path.basename(reframed), os.path.basename(tl_path),
                       t_out, cwd=os.path.abspath(args.workdir))
         print(f"[render] bilingual variant -> {t_out}")
     except Exception as exc:  # noqa: BLE001 - translation stays optional
         print(f"[render] translation failed (non-fatal): {exc}")
         if primary:
-            raise SystemExit("[render] translation-only render failed; "
-                             "no output written") from exc
+            raise SystemExit("[render] English-only render failed; no "
+                             "output written (permanent rule #17: no "
+                             "fallback to source-language captions)") from exc
 
 
 def _cut(source, start_ms, end_ms, workdir):
@@ -289,12 +329,15 @@ def main(argv=None):
     p.add_argument("--workdir", default="work")
     p.add_argument("--out", default="clip_final.mp4")
     p.add_argument("--translate-lang", default="")
+    p.add_argument("--caption-lang", default="",
+                   help="permanent rule #17: omit = the video's own "
+                        "language; 'en' = FULL English only (translated "
+                        "cues + English hook, no source-language "
+                        "captions); any other language asks you first")
     p.add_argument("--caption-mode", default="bilingual",
                    choices=["bilingual", "translation"],
-                   help="translation mode: the main output carries ONLY the "
-                        "translated line + hook (no source-language "
-                        "karaoke); bilingual: karaoke + raised translation "
-                        "variant as before")
+                   help="legacy knob: the permanent rule (#17) overrides "
+                        "it whenever English captions are chosen")
     p.add_argument("--provider", default="")
     p.set_defaults(fn=cmd_render)
 
