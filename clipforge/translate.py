@@ -64,10 +64,42 @@ def translate_cues(cues, target_lang, provider, chunk_size=30,
     return results
 
 
+def _fit_subtitle(text, width=42, max_lines=2):
+    """Fit a translated cue to the layout gate: <=max_lines lines of
+    <=width chars. Word-wraps for spaced scripts; hard-slices for
+    spaceless ones (CJK); overlong text is truncated with an ellipsis
+    rather than violating the caption layout (G2)."""
+    t = " ".join((text or "").split()).strip()
+    if len(t) <= width:
+        return t
+    if " " in t:
+        lines, cur = [], ""
+        for w in t.split():
+            cand = f"{cur} {w}".strip()
+            if len(cand) <= width:
+                cur = cand
+            else:
+                lines.append(cur)
+                cur = w if len(w) <= width else w[:width]
+            if len(lines) == max_lines:
+                break
+        if cur:
+            if len(lines) < max_lines:
+                lines.append(cur)
+            elif not lines[max_lines - 1].endswith("…"):
+                lines[max_lines - 1] = \
+                    lines[max_lines - 1][:width - 1].rstrip() + "…"
+        return "\n".join(lines[:max_lines])
+    return "\n".join(t[i * width:(i + 1) * width][:width - 1]
+                     if (i + 1) * width <= len(t) and i + 1 < max_lines
+                     else t[i * width:(i + 1) * width]
+                     for i in range(max_lines))[:2 * width]
+
+
 def write_translated(cues_translated, srt_path, vtt_path=None):
     from . import subtitles
     t_cues = [{"index": t["index"], "start_ms": t["start_ms"],
-               "end_ms": t["end_ms"], "text": t["target"]}
+               "end_ms": t["end_ms"], "text": _fit_subtitle(t["target"])}
               for t in cues_translated]
     with open(srt_path, "w") as f:
         f.write(subtitles.serialize_srt(t_cues))

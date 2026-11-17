@@ -66,3 +66,41 @@ def test_style_layout_keeps_trans_clear_of_captions():
         f"top {cap_top_worst:.0f}")
     # and the caption must fit 2+ display lines inside the safe band.
     assert cap["margin_v"] + 2 * cap["fontsize"] * 1.25 < 1920 * 0.5
+
+
+def test_build_translation_only_ass_has_no_source_karaoke(tmp_path):
+    """Issue #16: translation-only mode must emit ONLY TransSolo + Hook
+    events — no source-language karaoke Dialogue at all."""
+    cues = [{"start_ms": 100, "end_ms": 2000, "text": "Hello there"},
+            {"start_ms": 2500, "end_ms": 4000, "text": "Second line"}]
+    path = tmp_path / "solo.ass"
+    events = captions.build_translation_only_ass(cues, "HOOK TEXT", 6.0,
+                                                 str(path))
+    body = path.read_text()
+    assert body.count("Dialogue:") == 3  # 2 cues + hook
+    assert body.count(",TransSolo,,") == 2  # Dialogue rows only (header
+    # declares the style too, so count the dialogue-form occurrences)
+    assert "HOOK TEXT" in body
+    # styles may be declared in the header; no Dialogue may USE the
+    # source-language Caption style, and no karaoke timing may appear
+    for row in body.splitlines():
+        if row.startswith("Dialogue:"):
+            assert ",Caption,," not in row, row
+    assert "\\kf" not in body  # no karaoke timing anywhere
+    assert all(e.startswith("Dialogue: 0,") or e.startswith("Dialogue: 2,")
+               for e in events)
+
+
+def test_transsolo_sits_in_caption_zone():
+    """TransSolo (sole caption in translation mode) must occupy the normal
+    caption zone — bottom margin like Caption, not the raised bilingual
+    Trans position that would leave the caption area empty."""
+    styles = {}
+    for row in captions.HEADER.splitlines():
+        if row.startswith("Style:"):
+            parts = row.split(",")
+            styles[parts[0].split()[1]] = {
+                "fontsize": float(parts[2]), "margin_v": float(parts[20])}
+    cap, solo = styles["Caption"], styles["TransSolo"]
+    assert solo["margin_v"] == cap["margin_v"]
+    assert solo["fontsize"] >= cap["fontsize"] - 4

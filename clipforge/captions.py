@@ -15,6 +15,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: Caption,DejaVu Sans,64,&H00FFFFFF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,5,0,2,110,110,220,1
 Style: Hook,DejaVu Sans,104,&H0000D7FF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,1,0,1,6,0,8,60,60,330,1
 Style: Trans,DejaVu Sans,54,&H0000D7FF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,60,60,520,1
+Style: TransSolo,DejaVu Sans,64,&H00FFFFFF,&H0000D7FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,5,0,2,110,110,220,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -107,6 +108,34 @@ def build_bilingual_ass(words, translated_cues, hook, clip_duration, path):
     with open(path, "w") as f:
         f.write(HEADER + "\n".join(events) + "\n")
     return lines
+
+
+def build_translation_only_ass(translated_cues, hook, clip_duration, path):
+    """Only the translated line + hook — no source-language karaoke.
+
+    For clips whose speech is in a language the viewer can't read
+    (owner request: showcase a single caption, the translation). Uses the
+    TransSolo style so the translation occupies the normal caption zone.
+    """
+    events = []
+    for t in translated_cues:
+        text = (t.get("text") or t.get("target") or "").strip()
+        if not text:
+            continue
+        s = t["start_ms"] / 1000.0
+        e = max(s + 0.2, t["end_ms"] / 1000.0)
+        events.append(
+            f"Dialogue: 0,{_ass_time(s)},{_ass_time(e)},"
+            f"TransSolo,,0,0,0,,{_esc(text)}")
+    hook = (hook or "").strip()
+    if hook:
+        hook_end = min(HOOK_SECONDS, clip_duration)
+        events.append(
+            f"Dialogue: 2,{_ass_time(0)},{_ass_time(hook_end)},"
+            f"Hook,,0,0,0,,{_esc(hook)}")
+    with open(path, "w") as f:
+        f.write(HEADER + "\n".join(events) + "\n")
+    return events
 
 
 def burn(video_path, ass_path, out_path, cwd):
