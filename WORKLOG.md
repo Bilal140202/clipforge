@@ -207,3 +207,6 @@ fontconfig supplies CJK glyphs).
 1. Issue #6 output-validation module (Phase-2 exit).
 2. Issue #7 LLM re-ranking; #8 multilingual corpus + Ollama; #9 fonts.
 3. Issue #10 agent guides/MCP + screen-state maps; #11 docs set.
+
+### Checkpoint 2026-11-17T09:25:17+00:00 — session 4 complete: owner Korean footage clipped e2e (#15), KI-007 caption collision fixed (40108c8), recycle-wipe recovered from GitHub with zero loss
+- branch `main` head `3b35a6193e12` remote_head `3b35a6193e12` synced=True dirty=0
