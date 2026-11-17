@@ -160,3 +160,50 @@ tracking, persistence, and UI quality.
 
 ### Checkpoint 2026-11-16T17:10:26+00:00 — session 3: governance+recovery adopted, real-footage e2e (#13), UI audit Part III (#14); committing #12/#13/#14 work
 - branch `main` head `d37a04a38d75` remote_head `d37a04a38d75` synced=True dirty=8
+
+## Session 4 — 2026-11-17 (UTC): owner-provided footage e2e + recycle-recovery proof
+
+### Recovery event (the addendum working as designed)
+The sandbox recycle between turns wiped the ENTIRE `clipforge/` working
+tree (including `.git`). Remote `552cf21` was untouched. Recovery
+followed `docs/RECOVERY.md`: re-init git → fetch → `reset --mixed` →
+verify drift (43 deletions, zero local-only changes) → `reset --hard
+origin/main` → tests green. Lost runtime state: installed pip packages
+(reinstalled from pinned requirements.txt) and the git remote +
+credential config (re-added). Zero commits lost. First real recycle-wipe;
+the GitHub-first persistence held exactly as designed.
+
+### Owner footage run (issue #15)
+Owner uploaded a Drive video (`new.mp4`, 43.2MB): 335.1s (5m35s),
+1280x720 h264 30fps + AAC, **Korean speech** (auto-detected; 123
+segments / 279 words) — ClipForge's first non-English source. Pipeline:
+transcribe (faster-whisper base, lang=ko) → discover (5 kept / 66
+suppressed; rank-1 = 25.89-71.86s, score 70.7, hook "왜 한동안 이걸 찍을
+생각을 하지 못했을까요?") → render rank-1 45.97s 1080x1920,
+**face-tracked** reframe (MediaPipe path), ko→en translation (first
+non-es translation path, real LLM), karaoke + hook burn → subtitle
+gates 5/5, 0 violations → frames QA'd at 2s/20s/40s + hook.
+
+### Caption layout fix (KI-007 resolved)
+Frame QA at t=2s exposed a real collision: a 3-display-line karaoke
+caption touched the 2-line EN translation (Trans MarginV=440 landed
+exactly on the caption worst-case boundary). Fixed: Caption 78→64px +
+side margins 60→110, Trans MarginV→520, plus regression test
+`test_style_layout_keeps_trans_clear_of_captions` enforcing a 40px
+clearance (45/45 tests). Re-render verified clean at 2s/40s. Hangul
+renders correctly via libass font fallback (style declares DejaVu Sans;
+fontconfig supplies CJK glyphs).
+
+### Honest limitations recorded
+- Whisper `base` on casual Korean produces fragment/garbage tokens
+  (KI-008 non-English case; e.g. rank-5 hook); `--whisper-model small`
+  is the mitigation.
+- The source video carries its own burned-in Korean subtitles — they
+  coexist with ours in frames (inherent to the input, not a bug).
+- Keyword-heuristic discovery is English-biased; on Korean it ranked by
+  energy/flow (plausible top score 70.7) — issues #7/#8 remain the fix.
+
+### Next actions
+1. Issue #6 output-validation module (Phase-2 exit).
+2. Issue #7 LLM re-ranking; #8 multilingual corpus + Ollama; #9 fonts.
+3. Issue #10 agent guides/MCP + screen-state maps; #11 docs set.

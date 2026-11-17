@@ -32,12 +32,17 @@ is auto-selected for cloud unless configured; Ollama is preferred by
 `_write_out` handles both, but the ops contract would be cleaner with
 explicit --format. Cosmetic; tracked for the CLI polish pass.
 
-## KI-007 — Bilingual 2-line translation can graze the karaoke caption
-Trans style (MarginV=320) sits above Caption (MarginV=220); when the
-translated line wraps to 2 lines its lower edge can touch the caption
-block (observed on real-footage e2e, frame at ~20s). Fix in the caption
-polish pass: raise Trans MarginV or cap translations at 1 line with
-ellipsize-and-review. Cosmetic; not blocking.
+## KI-007 — RESOLVED 2026-11-17: translation/karaoke caption collision
+Originally: Trans (MarginV=320) could touch the caption block when the
+karaoke caption wrapped to 3 display lines (observed on owner footage,
+frame ~2s; and on NASA footage at ~20s as a graze). Fixed in
+`clipforge/captions.py`: Caption fontsize 78→64 with side margins
+60→110 (forces ≤2 display lines), Trans MarginV 320→520. Regression
+test `test_style_layout_keeps_trans_clear_of_captions` enforces a 40px
+clearance between the Trans bottom and the 3-line caption worst case
+(an intermediate fix at 440 failed in practice — a 2-line Trans met a
+3-line caption exactly at the boundary — so the test forbids
+boundary-touching, not just overlap). Verified on re-rendered frames.
 
 ## KI-008 — Base-model ASR artifacts on compressed low-res audio
 Real-footage e2e (NASA 320px preview, AAC compressed) produced plausible
