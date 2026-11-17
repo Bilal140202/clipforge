@@ -210,3 +210,26 @@ fontconfig supplies CJK glyphs).
 
 ### Checkpoint 2026-11-17T09:25:17+00:00 — session 4 complete: owner Korean footage clipped e2e (#15), KI-007 caption collision fixed (40108c8), recycle-wipe recovered from GitHub with zero loss
 - branch `main` head `3b35a6193e12` remote_head `3b35a6193e12` synced=True dirty=0
+
+## Session 5 — 2026-11-17 (UTC): translation-only caption mode (#16)
+
+Owner request: when a clip is translated, showcase ONLY the translated
+caption — no source-language karaoke. Implemented `render
+--caption-mode bilingual|translation` (default preserves prior behavior):
+
+- `captions.build_translation_only_ass`: TransSolo + Hook events only;
+  regression tests assert zero Caption-style dialogues and zero \kf.
+- New `TransSolo` style: Caption-zone geometry (MarginV 220, 64px) so a
+  solo translation does not float at the raised bilingual position.
+- In translation mode the MAIN output is the solo render (no karaoke
+  base burn); requires a working provider, else hard-exits rather than
+  silently shipping the wrong captions.
+- Found + fixed while gating the output: translated SRT was never gated
+  before and one LLM cue was 44 chars vs G2's 42 limit. New
+  `translate._fit_subtitle` (word-wrap 42, hard-slice for spaceless CJK,
+  2-line cap with ellipsis) enforces G2 deterministically; tests added.
+
+Verified: owner rank-1 re-rendered translation-only (45.97s, 1080x1920,
+face-tracked), gates 5/5 0 violations, frames QA'd (EN-only captions in
+zone; remaining Korean text in one frame is the source's own burn-in).
+52/52 tests.
