@@ -3,6 +3,23 @@
 All notable changes. Dates are UTC. Issue numbers reference
 `Bilal140202/clipforge` on GitHub.
 
+## [0.4.1] — 2026-11-17
+
+### Fixed — the "cuts camera angles every few seconds" reframe bug
+- Measured root cause: the MediaPipe face-track EMA could teleport the
+  9:16 crop between (often false-positive) detections with no speed
+  limit — delivered clips measured 6-9x the source's own motion
+  (median inter-frame change 33.4 vs 3.8-10.2 in the raw segment).
+- `reframe.py` rewritten: OpenCV Haar cascade (mediapipe dependency
+  removed), nearest-face stickiness (never bounces across the frame),
+  a 6%-width dead-zone and a hard glide cap (10% of width per second).
+  The fixed render measures 3.98 median change, 0 jump spikes.
+- Shot-aware discovery: new `clipforge/shots.py` (ffmpeg scene-change
+  detection); candidates gain the `shot_stability` sub-score, window
+  edges snap onto camera cuts (open on a fresh take, close before the
+  camera cuts away), and `internal_cuts` / `shot_evidence` are recorded
+  per candidate. 7 new unit tests (76 total).
+
 ## [0.4.0] — 2026-11-17
 
 ### Added — permanent caption-language rule (#17)

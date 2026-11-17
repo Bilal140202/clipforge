@@ -9,7 +9,7 @@ loop. Cloud LLM providers are optional adapters, never requirements.
 ```
 input video ──► local transcription (faster-whisper, word timestamps)
             ──► multi-signal moment discovery (ranked, explainable candidates)
-            ──► cut ──► 9:16 reframe (MediaPipe face-tracked / center fallback)
+            ──► cut ──► 9:16 reframe (OpenCV Haar face-glide, velocity-capped / center fallback)
             ──► captions decided by the permanent language rule (#17)
             ──► karaoke captions + hook (ASS burn)
             ──► subtitle gates (validate/repair, SRT + VTT export)

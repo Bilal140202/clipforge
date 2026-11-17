@@ -7,14 +7,19 @@ Newest first.
 (observed session 1). Pinned `av>=14.2,<15` in requirements.txt + pyproject.
 Re-visit when faster-whisper >1.2.1 ships.
 
-## KI-002 — mediapipe pinned 0.10.14 (legacy)
-Works on py3.12 (import verified). Upgrade requires a reframe verification
-run on real footage. Not touched yet.
+## KI-002 — RESOLVED (0.4.1): mediapipe removed from reframe
+The MediaPipe face-track EMA could teleport the crop between
+(false-positive) detections — measured 6-9x the source's own motion in
+delivered clips ("cuts camera angles every few seconds"). reframe.py
+now uses an OpenCV Haar cascade with nearest-face stickiness, a 6%
+dead-zone and a 10%-width-per-second glide cap. mediapipe is no longer
+a dependency.
 
 ## KI-003 — Discovery v1 is heuristic-only
 No LLM re-ranking yet; `transcription_confidence` stays null; language is
-per-transcript; `visual_evidence_refs` empty. By design for v1; tracked in
-Issues.
+per-transcript. v2 adds visual evidence: `visual_evidence_refs` carries
+`scene-detect` and candidates record `internal_cuts` + `shot_evidence`
+(shot-aware snapping and the `shot_stability` sub-score).
 
 ## KI-004 — CI not yet observed on the fresh repo
 `.github/workflows/tests.yml` from session 1 must be re-homed and its first

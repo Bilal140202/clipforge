@@ -28,14 +28,17 @@ from datetime import datetime, timezone
 
 import numpy as np
 
+from . import shots as shotmod
+
 # Sub-score weights (sum to 1.0). Kept explicit so results stay explainable.
 WEIGHTS = {
-    "hook_strength": 0.25,
-    "completeness": 0.20,
-    "speech_density": 0.20,
-    "audio_energy": 0.15,
+    "hook_strength": 0.20,
+    "completeness": 0.18,
+    "speech_density": 0.18,
+    "audio_energy": 0.14,
     "ending_quality": 0.10,
     "duration_fit": 0.10,
+    "shot_stability": 0.10,
 }
 SENTENCE_ENDERS = {".", "!", "?"}
 HOOK_SUPERLATIVES = ("best", "worst", "never", "always", "secret",
@@ -218,7 +221,8 @@ def _density(words_in_window, dur):
     return float(min(1.0, (wps / 2.2) if wps < 2.2 else 3.8 / wps))
 
 
-def score_candidate(cand, sentences, words, z, hop_sec, min_clip, max_clip):
+def score_candidate(cand, sentences, words, z, hop_sec, min_clip, max_clip,
+                    shots=None):
     start, end = cand["start"], cand["end"]
     dur = end - start
     win_words = [w for w in words if w["end"] > start and w["start"] < end]
@@ -233,6 +237,11 @@ def score_candidate(cand, sentences, words, z, hop_sec, min_clip, max_clip):
         "ending_quality": round(_ending_quality(end, sentences, z, hop_sec),
                                 3),
         "duration_fit": round(_duration_fit(dur, min_clip, max_clip), 3),
+        # neutral 0.5 when no visual evidence was computed (shots=None):
+        # the window's camera-cut count is unknown, not good or bad.
+        "shot_stability": round(
+            shotmod.shot_stability_score(start, end, shots)
+            if shots is not None else 0.5, 3),
     }
     overall = sum(WEIGHTS[k] * components[k] for k in WEIGHTS)
     return components, overall
@@ -259,11 +268,20 @@ def dedup(cands, iou=DEDUP_IOU):
 # ------------------------------------------------------------- entry point
 def discover_moments(transcript, duration=None, audio_path=None,
                      min_clip=15.0, max_clip=60.0, top_n=5,
-                     source_asset_id=None):
-    """Return the ranked candidate list with explainable evidence."""
+                     source_asset_id=None, shots=None, video_path=None):
+    """Return the ranked candidate list with explainable evidence.
+
+    shots: camera-cut timestamps (clipforge.shots). When None and
+    video_path is a real file they are detected here, so candidates
+    snap to shot boundaries and get the shot_stability sub-score.
+    """
     words = transcript.get("words") or []
     duration = float(duration or transcript.get("duration")
                      or (words[-1]["end"] if words else 0.0))
+    if shots is None and (video_path or audio_path):
+        media = video_path or audio_path
+        if media and os.path.isfile(media):
+            shots = shotmod.detect_shot_changes(media)
     sentences = sentences_from_words(words)
     z, hop_sec = None, 0.5
     if audio_path:
@@ -273,10 +291,18 @@ def discover_moments(transcript, duration=None, audio_path=None,
 
     raw = generate_candidates(sentences, duration, min_clip, max_clip,
                               z=z, hop_sec=hop_sec)
+    if shots:
+        # boundary discipline, visual edition: open on a fresh take,
+        # close before the camera cuts away
+        raw = [{"start": s, "end": e, "origin": c["origin"]}
+               for c in raw
+               for s, e in [shotmod.snap_to_shots(c["start"], c["end"],
+                                                  shots, duration,
+                                                  min_clip, max_clip)]]
     scored = []
     for c in raw:
         comps, overall = score_candidate(c, sentences, words, z, hop_sec,
-                                         min_clip, max_clip)
+                                         min_clip, max_clip, shots=shots)
         scored.append({**c, "components": comps, "overall": overall})
     kept, suppressed = dedup(scored)
     kept = kept[: max(1, int(top_n))]
@@ -300,6 +326,13 @@ def discover_moments(transcript, duration=None, audio_path=None,
             flags.append("loud_section_check_audio")
         comps = c["components"]
         reasons = sorted(comps.items(), key=lambda kv: -kv[1])[:2]
+        internal_cuts = (shotmod.cuts_in_window(start, end, shots)
+                         if shots else None)
+        if internal_cuts is not None:
+            if internal_cuts > shotmod.expected_cuts(end - start):
+                flags.append("frequent_camera_cuts")
+            elif internal_cuts == 0:
+                flags.append("single_camera_take")
         human = {
             "hook_strength": "strong opening line",
             "completeness": "clean start/end boundaries",
@@ -307,6 +340,7 @@ def discover_moments(transcript, duration=None, audio_path=None,
             "audio_energy": "energetic audio section",
             "ending_quality": "lands on a sentence ending",
             "duration_fit": "duration fits the target",
+            "shot_stability": "stays within few camera takes",
         }
         candidates.append({
             "candidate_id": f"cand-{rank:02d}",
@@ -317,7 +351,12 @@ def discover_moments(transcript, duration=None, audio_path=None,
             "rank": rank,
             "overall_score": round(100 * c["overall"], 1),
             "score_components": comps,
-            "score_basis": "heuristic multi-signal v1 (not calibrated)",
+            "score_basis": "heuristic multi-signal v2 (shot-aware, not "
+                           "calibrated)",
+            "internal_cuts": internal_cuts,
+            "shot_evidence": (shotmod.stability_note(internal_cuts,
+                                                     end - start)
+                              if internal_cuts is not None else None),
             "transcript_excerpt": excerpt,
             "detected_language_segments": [{
                 "language": transcript.get("language"),
@@ -333,7 +372,8 @@ def discover_moments(transcript, duration=None, audio_path=None,
                                 if before else "(start of video)"),
             "boundary_confidence": comps["completeness"],
             "transcription_confidence": None,
-            "visual_evidence_refs": [],
+            "visual_evidence_refs": (["scene-detect"]
+                                     if shots else []),
             "audio_evidence_refs": (["rms-energy-hop"]
                                     if z is not None else []),
             "risk_flags": flags,
@@ -366,6 +406,12 @@ def main():
                     help="transcript.json from clipforge.transcribe")
     ap.add_argument("--audio", default="",
                     help="media file for RMS energy evidence (optional)")
+    ap.add_argument("--video", default="",
+                    help="media file for shot-change detection; defaults "
+                         "to --audio when it points at a real file")
+    ap.add_argument("--no-shot-snap", action="store_true",
+                    help="disable camera-cut snapping and the "
+                         "shot_stability sub-score")
     ap.add_argument("--top-n", type=int, default=5)
     ap.add_argument("--min-clip", type=float, default=15.0)
     ap.add_argument("--max-clip", type=float, default=60.0)
@@ -379,7 +425,9 @@ def main():
                               min_clip=args.min_clip,
                               max_clip=args.max_clip,
                               top_n=args.top_n,
-                              source_asset_id=args.source_asset_id)
+                              source_asset_id=args.source_asset_id,
+                              video_path=(None if args.no_shot_snap
+                                          else args.video or None))
     with open(args.out, "w") as f:
         json.dump(result, f, indent=2)
     for c in result["candidates"]:

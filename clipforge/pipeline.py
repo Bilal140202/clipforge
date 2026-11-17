@@ -100,6 +100,8 @@ def main():
                     help="Candidate count kept by --use-discover")
     ap.add_argument("--workdir", default="work")
     ap.add_argument("--outdir", default="out")
+    ap.add_argument("--no-shot-snap", action="store_true",
+                    help="do not snap the cut window to camera cuts")
     args = ap.parse_args()
 
     os.makedirs(args.workdir, exist_ok=True)
@@ -112,7 +114,8 @@ def main():
         from . import discover
         result = discover.discover_moments(
             transcript, audio_path=source, min_clip=args.min_clip,
-            max_clip=args.max_clip, top_n=args.top_n)
+            max_clip=args.max_clip, top_n=args.top_n,
+            video_path=(None if args.no_shot_snap else source))
         cpath = os.path.join(args.outdir, "candidates.json")
         with open(cpath, "w") as f:
             json.dump(result, f, indent=2)
@@ -135,6 +138,23 @@ def main():
             transcript, args.ollama_url, args.llm_model,
             args.min_clip, args.max_clip, args.workdir, use_llm=not args.no_llm)
     start, end = moment["start"], moment["end"]
+
+    # Visual boundary discipline: snap the window onto camera cuts so
+    # the clip opens on a fresh take and closes before the camera cuts
+    # away (the content boundaries above are already sentence-clean).
+    from . import shots as shotmod
+    shot_times = []
+    if not args.no_shot_snap:
+        shot_times = shotmod.detect_shot_changes(source)
+        if shot_times:
+            start, end = shotmod.snap_to_shots(
+                start, end, shot_times, float(transcript["duration"]),
+                args.min_clip, args.max_clip)
+            print(f"[shots] {len(shot_times)} camera cuts detected; "
+                  f"window snapped to {start:.2f}-{end:.2f}s")
+        else:
+            print("[shots] no shot-change evidence (ffmpeg failed or "
+                  "single-take source) - window unchanged")
 
     # Permanent caption-language rule (#17): decide BEFORE heavy work.
     from . import langrule
