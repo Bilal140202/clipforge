@@ -10,7 +10,6 @@ on:
 # Zero-charge by policy: standard runners are free and unlimited on PUBLIC repositories
 # (https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 # Renders only PUBLIC content: lemo-opuscar's own precise-mechanism demo.
-# Measures SwiftShader software-WebGL per-frame time on a GitHub runner.
 jobs:
   benchmark:
     runs-on: ubuntu-latest
@@ -25,26 +24,52 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install deps + chromium-headless-shell + CC0 HDRI
+      - name: Install deps + chromium-headless-shell + CC0 HDRI + OFL fonts
         run: |
           cd lemo
           npm install --no-audit --no-fund
           node node_modules/playwright-core/cli.js install chromium-headless-shell
           sh tools/fetch.sh hdri
+          F=styles/precise-mechanism/demo/fonts
+          G=https://github.com/google/fonts/raw/main/ofl
+          curl -sfL -o "$F/Inter-VF.ttf" "$G/inter/Inter%5Bopsz,wght%5D.ttf"
+          curl -sfL -o "$F/NotoSansSC-VF.ttf" "$G/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+          curl -sfL -o "$F/IBMPlexMono-Medium.ttf" "$G/ibmplexmono/IBMPlexMono-Medium.ttf"
 
-      - name: Render 5 stills, report per-frame timing
+      - name: Render 2.5s motion clip (60 frames @24fps), encode MP4
         env:
           LEMO_ANGLE: swiftshader
         run: |
           cd lemo
-          node core/render/still.mjs styles/precise-mechanism/demo 2 4 6 8 10 \
-            --size 1080x1920 --q '${{ inputs.q }}' --out bench 2>&1 | tee bench.log
-          grep -E 'jpg [0-9]+ms' bench.log || (echo 'NO FRAMES RENDERED'; exit 1)
+          cat > render-clip.mjs <<'JS'
+          import { spawn } from 'child_process';
+          import { openDemo, closeServer } from './core/render/page.mjs';
+          const dir = 'styles/precise-mechanism/demo';
+          const FPS = 24, N = 60, T0 = 8;
+          const { browser, page } = await openDemo(dir, { w: 1080, h: 1920, q: process.env.RENDER_Q || '' });
+          const ff = spawn('ffmpeg', ['-y','-loglevel','error','-f','image2pipe','-framerate',String(FPS),'-c:v','mjpeg','-i','-','-c:v','libx264','-preset','medium','-crf','18','-pix_fmt','yuv420p','clip.mp4'], { stdio: ['pipe','inherit','inherit'] });
+          const t0 = Date.now();
+          for (let f = 0; f < N; f++) {
+            const t = T0 + f / FPS;
+            await page.evaluate(t => window.render(t), t);
+            const buf = await page.screenshot({ type: 'jpeg', quality: 90 });
+            if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once('drain', r));
+            if (f % 15 === 0) console.log(`frame ${f}/${N} t=${t.toFixed(2)} elapsed=${((Date.now()-t0)/1000)|0}s`);
+          }
+          ff.stdin.end(); await new Promise(r => ff.on('close', r));
+          await browser.close(); closeServer();
+          console.log('RENDER_DONE frames=' + N + ' elapsed_s=' + ((Date.now()-t0)/1000).toFixed(1));
+          JS
+          RENDER_Q='${{ inputs.q }}' node render-clip.mjs 2>&1 | tee clip.log
+          grep -q 'RENDER_DONE frames=60' clip.log || (echo 'CLIP RENDER FAILED'; exit 1)
+          ffprobe -v error -show_entries stream=codec_name,width,height,nb_frames,r_frame_rate -show_entries format=duration,size -of default=noprint_wrappers=1 clip.mp4 | tee probe.log
+          grep -q 'nb_frames=60' probe.log || (echo 'MP4 FRAME COUNT MISMATCH'; exit 1)
 
       - uses: actions/upload-artifact@v4
         with:
-          name: lemo-benchmark-stills
+          name: lemo-demo-clip
           path: |
-            lemo/bench/
-            lemo/bench.log
+            lemo/clip.mp4
+            lemo/clip.log
+            lemo/probe.log
           retention-days: 1
