@@ -24,6 +24,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install ffmpeg
+        run: sudo apt-get install -y -qq ffmpeg
+
       - name: Install deps + chromium-headless-shell + CC0 HDRI + OFL fonts
         run: |
           cd lemo
