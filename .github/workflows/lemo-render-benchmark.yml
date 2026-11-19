@@ -1,0 +1,50 @@
+name: Lemo public-demo render benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      q:
+        description: "Render quality flags"
+        required: true
+        default: "ssaa=1.25&shadow=1024"
+
+# Zero-charge by policy: standard runners are free and unlimited on PUBLIC repositories
+# (https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+# Renders only PUBLIC content: lemo-opuscar's own precise-mechanism demo.
+# Measures SwiftShader software-WebGL per-frame time on a GitHub runner.
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Clone lemo-opuscar at pinned commit 00a7f9ec
+        run: |
+          git clone -q --no-checkout https://github.com/lemomo-ai/lemo-opuscar lemo
+          git -C lemo checkout -q 00a7f9ec
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install deps + chromium-headless-shell + CC0 HDRI
+        run: |
+          cd lemo
+          npm install --no-audit --no-fund
+          node node_modules/playwright-core/cli.js install chromium-headless-shell
+          sh tools/fetch.sh hdri
+
+      - name: Render 5 stills, report per-frame timing
+        env:
+          LEMO_ANGLE: swiftshader
+        run: |
+          cd lemo
+          node core/render/still.mjs styles/precise-mechanism/demo 2 4 6 8 10 \
+            --size 1080x1920 --q '${{ inputs.q }}' --out bench 2>&1 | tee bench.log
+          grep -E 'jpg [0-9]+ms' bench.log || (echo 'NO FRAMES RENDERED'; exit 1)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lemo-benchmark-stills
+          path: |
+            lemo/bench/
+            lemo/bench.log
+          retention-days: 1
